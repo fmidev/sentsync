@@ -8,10 +8,13 @@ import tempfile
 from copy import deepcopy
 from uuid import uuid4
 from sentinelsat import SentinelAPI
+from time import sleep
 
 
 now = datetime.datetime.utcnow()
 today = datetime.datetime(now.year,now.month,now.day)
+# keep this reasonable not to overload but not to miss
+nrt_polling_time = datetime.timedelta(seconds=60)
 
 def getScriptPath():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -60,6 +63,8 @@ parser.add_argument('--username', help = "Username for the Sentinel hub.")
 parser.add_argument('--password', help = "Password for the Sentinel hub.")
 parser.add_argument('--credentials-file', help = "Credentils file for the Sentinel hub. Do not use url, username and password with this. See readme for format.")
 
+parser.add_argument('--rerun-latency', help = "Rerun the download if that many seconds has passed. (NRT option)")
+
 args = parser.parse_args()
 arg_list = [arg.replace('_','-') for arg in list(args.__dict__.keys())]
 value_list = list(args.__dict__.values())
@@ -104,10 +109,14 @@ if args.config_file is not None:
                     else:
                         scenes[scene_label_product].update({arg:None})
 
+            scenes[scene_label_product].update({"last-run-time":None})
+
 else:
     # set cli options as scene
     scenes = {
-        "cli" : {}
+        "cli" : {
+            "last-run-time" : None
+        }
     }
     for a,arg in enumerate(arg_list):
         scenes["cli"].update({arg:value_list[a]})
@@ -158,6 +167,17 @@ for scene_label in scenes:
             terminate_cli()
         else:
             terminate_cfg(scenes[scene_label]["config-file"],scene_label)
+
+    # Is rerun latency integer?
+    if scenes[scene_label]["rerun-latency"] is not None:
+        try:
+            scenes[scene_label]["rerun-latency"] = int(scenes[scene_label]["rerun-latency"])
+        except:
+            write2log(parent_log_path,"ERROR","Rerun latency is not an integer.")
+            if scene_label == "cli":
+                terminate_cli()
+            else:
+                terminate_cfg(scenes[scene_label]["config-file"],scene_label)
 
     # use realpaths
     for arg in scenes[scene_label]:
@@ -282,53 +302,79 @@ for scene_label in scenes:
                 terminate_cfg(scenes[scene_label]["config-file"],scene_label)
 
 write2log(parent_log_path,severity="INFO",description="Config file and/or arguments are valid. Processing to download.")
+
+# check if there is any scene with rerun-latency option
+keep_running = False
+last_run_time = None
 for scene_label in scenes:
-    date_extents = []
-    if scenes[scene_label]["day-range"] is not None:
-        date_extents = [list(scenes[scene_label]["day-range"])]
-        date_extents[0][1] += datetime.timedelta(days=1,seconds=-1)
-        date_extents[0] = tuple(date_extents[0])
+    if scenes[scene_label]["rerun-latency"] is not None:
+        keep_running = True
+        write2log(parent_log_path,severity="INFO",description="At least one scene has rerun option, the script will be kept open for re-downloading.")
+        break
 
-    if scenes[scene_label]["day"] is not None:  #offset already converted to daylist
-        for day in scenes[scene_label]["day"]:
-            date_extents.append((day, day + datetime.timedelta(days=1,seconds=-1)))
-            
-    write2log(parent_log_path,severity="INFO",description="Processing download of %s products for the scene \"%s\". Scene options:" % (scenes[scene_label]["product"],scene_label.replace("|"+scenes[scene_label]["product"],"")))
-    write2log(parent_log_path,severity="INFO",description="- Area: %s" % scenes[scene_label]["wkt"])
-    for date_extent in date_extents:
-        write2log(parent_log_path,severity="INFO",description="- Date range: %s - %s" % (date_extent[0].strftime("%Y%m%dT%H%M%S"), date_extent[1].strftime("%Y%m%dT%H%M%S")))
-    write2log(parent_log_path,severity="INFO",description="- Hub: %s" % scenes[scene_label]["hub-url"])
-    write2log(parent_log_path,severity="INFO",description="- Target directory: %s" % scenes[scene_label]["target-dir"])
-    write2log(parent_log_path,severity="INFO",description="- Log file: %s" % scenes[scene_label]["log-file"])
+while last_run_time is None or keep_running:
+    # Re-run/NRT check/set for the script       
+    # if not the first run (also means some scene has rerun option) and the time has not passed yet, sleep that much (dont overload the machine)
+    if last_run_time is not None and datetime.datetime.utcnow() - last_run_time < nrt_polling_time:
+        nap_time = nrt_polling_time - (datetime.datetime.utcnow() - last_run_time)
+        write2log(parent_log_path,severity="INFO",description="At least one scene has rerun option, but NRT polling time for the script has not passed yet. Sleeping %s seconds." % nap_time.total_seconds())
+        sleep(nap_time.total_seconds())
+    last_run_time = datetime.datetime.utcnow()
 
-    write2log(scenes[scene_label]["log-file"],severity="INFO",description="Logging into the hub %s" % scenes[scene_label]["hub-url"])
-    try:
-        api = SentinelAPI(scenes[scene_label]["username"], scenes[scene_label]["password"], scenes[scene_label]["hub-url"])
-    except:
-        # TODO include API error to log
-        write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in logging in. Skipping scene.")
-        write2log(parent_log_path,severity="ERROR",description="Error in logging in. See log file at %s. Skipping scene." % scenes[scene_label]["log-file"])
-        continue
-
-    for date_extent in date_extents:
-        write2log(scenes[scene_label]["log-file"],severity="INFO",description="Requesting %s products from %s to %s in given WKT." % (
-            scenes[scene_label]["product"], date_extent[0].strftime("%Y%m%dT%H%M%S"), date_extent[1].strftime("%Y%m%dT%H%M%S")
-        ))
-        
-        products = api.query(
-            area = scenes[scene_label]["wkt"],
-            producttype = scenes[scene_label]["product"], 
-            date = date_extent
-        )
-
-        write2log(scenes[scene_label]["log-file"],severity="INFO",description="%s products found." % len(products))
-
-        try:
-            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download of %s products" % len(products))
-            api.download_all(products, scenes[scene_label]["target-dir"], max_attempts=2,checksum=True)
-            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Download is complete.")
-        except:
-            # TODO include download log/error to log
-            write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in downloading. Skipping download.")
-            write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
+    for scene_label in scenes:
+        # Re-run/NRT check/set for the scene
+        # if not the first run and (scene has no rerun option or the time has not passed yet), skip this scene
+        if scenes[scene_label]["last-run-time"] is not None and (scenes[scene_label]["rerun-latency"] is None or datetime.datetime.utcnow() - scenes[scene_label]["last-run-time"] < datetime.timedelta(seconds=scenes[scene_label]["rerun-latency"])):
+            write2log(parent_log_path,severity="INFO",description="The scene %s has rerun option, but requested latency has not passed yet. Skipping the scene." % scene_label)
             continue
+        scenes[scene_label]["last-run-time"] = datetime.datetime.utcnow()
+
+        date_extents = []
+        if scenes[scene_label]["day-range"] is not None:
+            date_extents = [list(scenes[scene_label]["day-range"])]
+            date_extents[0][1] += datetime.timedelta(days=1,seconds=-1)
+            date_extents[0] = tuple(date_extents[0])
+
+        if scenes[scene_label]["day"] is not None:  #offset already converted to daylist
+            for day in scenes[scene_label]["day"]:
+                date_extents.append((day, day + datetime.timedelta(days=1,seconds=-1)))
+                
+        write2log(parent_log_path,severity="INFO",description="Processing download of %s products for the scene \"%s\". Scene options:" % (scenes[scene_label]["product"],scene_label.replace("|"+scenes[scene_label]["product"],"")))
+        write2log(parent_log_path,severity="INFO",description="- Area: %s" % scenes[scene_label]["wkt"])
+        for date_extent in date_extents:
+            write2log(parent_log_path,severity="INFO",description="- Date range: %s - %s" % (date_extent[0].strftime("%Y%m%dT%H%M%S"), date_extent[1].strftime("%Y%m%dT%H%M%S")))
+        write2log(parent_log_path,severity="INFO",description="- Hub: %s" % scenes[scene_label]["hub-url"])
+        write2log(parent_log_path,severity="INFO",description="- Target directory: %s" % scenes[scene_label]["target-dir"])
+        write2log(parent_log_path,severity="INFO",description="- Log file: %s" % scenes[scene_label]["log-file"])
+
+        write2log(scenes[scene_label]["log-file"],severity="INFO",description="Logging into the hub %s" % scenes[scene_label]["hub-url"])
+        try:
+            api = SentinelAPI(scenes[scene_label]["username"], scenes[scene_label]["password"], scenes[scene_label]["hub-url"])
+        except:
+            # TODO include API error to log
+            write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in logging in. Skipping scene.")
+            write2log(parent_log_path,severity="ERROR",description="Error in logging in. See log file at %s. Skipping scene." % scenes[scene_label]["log-file"])
+            continue
+
+        for date_extent in date_extents:
+            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Requesting %s products from %s to %s in given WKT." % (
+                scenes[scene_label]["product"], date_extent[0].strftime("%Y%m%dT%H%M%S"), date_extent[1].strftime("%Y%m%dT%H%M%S")
+            ))
+            
+            products = api.query(
+                area = scenes[scene_label]["wkt"],
+                producttype = scenes[scene_label]["product"], 
+                date = date_extent
+            )
+
+            write2log(scenes[scene_label]["log-file"],severity="INFO",description="%s products found." % len(products))
+
+            try:
+                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download of %s products" % len(products))
+                api.download_all(products, scenes[scene_label]["target-dir"], max_attempts=2,checksum=True)
+                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Download is complete.")
+            except:
+                # TODO include download log/error to log
+                write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in downloading. Skipping download.")
+                write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
+                continue
