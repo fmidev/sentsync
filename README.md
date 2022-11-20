@@ -6,6 +6,10 @@
 
 # Credentials file format in file: credentials_example
 
+# Use a config file for nrt and send it to background using nohup
+
+nohup path_to_python_in_env_bin sentsync.py --config-file config_example.json 2>>/dev/null 1>>/dev/null &
+
 # Packages in conda environment tested with:
 
 Name                    Version                   Build  Channel
