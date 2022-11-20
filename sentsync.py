@@ -283,9 +283,9 @@ write2log(parent_log_path,severity="INFO",description="Config file and/or argume
 for scene_label in scenes:
     date_extents = []
     if scenes[scene_label]["day-range"] is not None:
-        date_extents = [scenes[scene_label]["day-range"]]
-        if date_extents[0][0] == date_extents[0][1]:  # so that later this can be changed to include hour and minute and second
-            date_extents[0][1] += datetime.timedelta(days=1,seconds=-1)
+        date_extents = [list(scenes[scene_label]["day-range"])]
+        date_extents[0][1] += datetime.timedelta(days=1,seconds=-1)
+        date_extents[0] = tuple(date_extents[0])
 
     if scenes[scene_label]["day"] is not None:  #offset already converted to daylist
         for day in scenes[scene_label]["day"]:
