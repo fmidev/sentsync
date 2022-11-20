@@ -325,7 +325,7 @@ while last_run_time is None or keep_running:
         # Re-run/NRT check/set for the scene
         # if not the first run and (scene has no rerun option or the time has not passed yet), skip this scene
         if scenes[scene_label]["last-run-time"] is not None and (scenes[scene_label]["rerun-latency"] is None or datetime.datetime.utcnow() - scenes[scene_label]["last-run-time"] < datetime.timedelta(seconds=scenes[scene_label]["rerun-latency"])):
-            scenes[scene_label]["rerun-latency"] is not None:
+            if scenes[scene_label]["rerun-latency"] is not None:
                 write2log(parent_log_path,severity="INFO",description="The scene %s has rerun option, but requested latency has not passed yet. Skipping the scene." % scene_label)
             continue
         scenes[scene_label]["last-run-time"] = datetime.datetime.utcnow()
