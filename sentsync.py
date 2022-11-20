@@ -219,11 +219,13 @@ for scene_label in scenes:
 
     if scenes[scene_label]["day"] is not None:
         daylist = []
+        if isinstance(scenes[scene_label]["day"],str):
+            scenes[scene_label]["day"] = [scenes[scene_label]["day"]]
         for day in scenes[scene_label]["day"]:
             try:
                 day = datetime.datetime.strptime(day,"%Y%m%d")
             except:
-                write2log(parent_log_path,"ERROR","Day string %s not in correct format." % day)
+                write2log(parent_log_path,"ERROR","Day list or day string in day list %s not in correct format." % scenes[scene_label]["day"])
                 if scene_label == "cli":
                     terminate_cli()
                 else:
