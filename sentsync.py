@@ -290,6 +290,14 @@ for scene_label in scenes:
     if scenes[scene_label]["day"] is not None:  #offset already converted to daylist
         for day in scenes[scene_label]["day"]:
             date_extents.append((day, day + datetime.timedelta(days=1,seconds=-1)))
+            
+    write2log(parent_log_path,severity="INFO",description="Processing download of %s products for the scene \"%s\". Scene options:" % (scenes[scene_label]["product"],scene_label.replace("|"+scenes[scene_label]["product"],"")))
+    write2log(parent_log_path,severity="INFO",description="- Area: %s" % scenes[scene_label]["wkt"])
+    for date_extent in date_extents:
+        write2log(parent_log_path,severity="INFO",description="- Date range: %s - %s" % (date_extent[0].strftime("%Y%m%dT%H%M%S"), date_extent[1].strftime("%Y%m%dT%H%M%S")))
+    write2log(parent_log_path,severity="INFO",description="- Hub: %s" % scenes[scene_label]["hub-url"])
+    write2log(parent_log_path,severity="INFO",description="- Target directory: %s" % scenes[scene_label]["target-dir"])
+    write2log(parent_log_path,severity="INFO",description="- Log file: %s" % scenes[scene_label]["log-file"])
 
     write2log(scenes[scene_label]["log-file"],severity="INFO",description="Logging into the hub %s" % scenes[scene_label]["hub-url"])
     try:
@@ -299,7 +307,6 @@ for scene_label in scenes:
         write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in logging in. Skipping scene.")
         write2log(parent_log_path,severity="ERROR",description="Error in logging in. See log file at %s. Skipping scene." % scenes[scene_label]["log-file"])
         continue
-
 
     for date_extent in date_extents:
         write2log(scenes[scene_label]["log-file"],severity="INFO",description="Requesting %s products from %s to %s in given WKT." % (
@@ -315,7 +322,7 @@ for scene_label in scenes:
         write2log(scenes[scene_label]["log-file"],severity="INFO",description="%s products found." % len(products))
 
         try:
-            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download for %s products" % len(products))
+            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download of %s products" % len(products))
             api.download_all(products, scenes[scene_label]["target-dir"], max_attempts=2,checksum=True)
             write2log(scenes[scene_label]["log-file"],severity="INFO",description="Download is complete.")
         except:
