@@ -254,26 +254,26 @@ for scene_label in scenes:
         scenes[scene_label]["day"] = deepcopy(daylist)
 
     if scenes[scene_label]["day-offset"] is not None:
-        daylist = []
+        offsetlist = []
         for day_offset in scenes[scene_label]["day-offset"]:
             try:
-                day = today + datetime.timedelta(days=int(day_offset))
+                if day_offset != int(day_offset):   # a number and integer
+                    raise
+                day_offset = int(day_offset)
             except:
                 write2log(parent_log_path,severity="ERROR",description="Day offset %s in argument not in correct format." % day_offset)
                 if scene_label == "cli":
                     terminate_cli()
                 else:
                     terminate_cfg(scenes[scene_label]["config-file"],scene_label)
-            if day > today:
+            if day_offset > 0:
                 write2log(parent_log_path,severity="ERROR",description="Day offset %s means a future day. No foretelling." % day_offset)
                 if scene_label == "cli":
                     terminate_cli()
                 else:
                     terminate_cfg(scenes[scene_label]["config-file"],scene_label)
-            daylist.append(day)
-        # convert to daylist
-        scenes[scene_label]["day"] = deepcopy(daylist)
-        scenes[scene_label]["day-offset"] = None
+            offsetlist.append(day_offset)
+        scenes[scene_label]["day-offset"] = deepcopy(offsetlist)
 
     # TODO check extent (if poly or bb is valid)
     if "+" in scenes[scene_label]["wkt"]:
@@ -320,6 +320,7 @@ while last_run_time is None or keep_running:
         write2log(parent_log_path,severity="INFO",description="At least one scene has rerun option, but NRT polling time for the script has not passed yet. Sleeping %s seconds." % nap_time.total_seconds())
         sleep(nap_time.total_seconds())
     last_run_time = datetime.datetime.utcnow()
+    last_run_day = datetime.datetime(last_run_time.year,last_run_time.month,last_run_time.day)
 
     for scene_label in scenes:
         # Re-run/NRT check/set for the scene
@@ -336,8 +337,13 @@ while last_run_time is None or keep_running:
             date_extents[0][1] += datetime.timedelta(days=1,seconds=-1)
             date_extents[0] = tuple(date_extents[0])
 
-        if scenes[scene_label]["day"] is not None:  #offset already converted to daylist
+        if scenes[scene_label]["day"] is not None:
             for day in scenes[scene_label]["day"]:
+                date_extents.append((day, day + datetime.timedelta(days=1,seconds=-1)))
+
+        if scenes[scene_label]["day-offset"] is not None:
+            for day_offset in scenes[scene_label]["day-offset"]:
+                day = last_run_day + datetime.timedelta(days=day_offset)
                 date_extents.append((day, day + datetime.timedelta(days=1,seconds=-1)))
                 
         write2log(parent_log_path,severity="INFO",description="Processing download of %s products for the scene \"%s\". Scene options:" % (scenes[scene_label]["product"],scene_label.replace("|"+scenes[scene_label]["product"],"")))
