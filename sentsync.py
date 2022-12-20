@@ -385,3 +385,26 @@ while last_run_time is None or keep_running:
                 write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in downloading. Skipping download.")
                 write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
                 continue
+
+            if scenes[scene_label]["day-offset"] is not None:
+                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Removing products out of day-offset range (rolling sync)")
+                num_deleted = 0
+                for filename in os.listdir(scenes[scene_label]["target-dir"]):
+                    if os.path.join(scenes[scene_label]["target-dir"],filename) == scenes[scene_label]["log-file"]:
+                        continue
+                    api_filename = os.path.splitext(filename)[0] if os.path.splitext(filename)[1] == ".zip" else filename
+                    products = api.query(
+                        filename = api_filename
+                    )
+                    if len(products) == 0:
+                        write2log(scenes[scene_label]["log-file"],severity="WARNING",description="Product %s in the target folder cannot be found via API. The file may be corrupt." % filename)
+                    else:
+                        file_date = api.get_product_odata(list(products)[0])["date"]
+                        file_not_valid = True
+                        for date_extent in date_extents:
+                            if file_date >= date_extent[0] and file_date <= date_extent[1]:
+                                file_not_valid = False
+                                break
+                        if file_not_valid:
+                            os.remove(os.path.join(scenes[scene_label]["target-dir"],filename))
+                            num_deleted += 1
