@@ -44,7 +44,7 @@ def terminate_cfg(config_file,scene):
     write2log(parent_log_path,"INFO",'Terminating. Check scene %s in config file %s.' % (scene,config_file))
     exit()
 
-parser = argparse.ArgumentParser(description = "Reproject and resample 1km IMS to target grid.")
+parser = argparse.ArgumentParser(description = "Download Sentinel files from Sentinel hubs in scenes (time and area definition) for NRT and case studies.")
 parser.add_argument('--config-file', help = "Path to the (json) config file. See readme or the example. Cannot be used with other arguments.")
 
 parser.add_argument('--day-offset', action = "append", help = "Offset in days (int) from today (e.g. -1 is yesterday). Can be used multiple times. Cannot be used with -d or -r.")
