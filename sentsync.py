@@ -187,7 +187,7 @@ for scene_label in scenes:
 
     # check existence-permissions
     if os.path.exists(scenes[scene_label]["log-file"]):
-        write2log(parent_log_path,"WARNING","Log file in the config exists. Log will be appended.")
+        write2log(parent_log_path,"INFO","Log file in the config exists. Log will be appended.")
         if not os.access(scenes[scene_label]["log-file"], os.W_OK):
             write2log(parent_log_path,"ERROR","Log file in config is not writable.")
             if scene_label == "cli":
@@ -204,7 +204,7 @@ for scene_label in scenes:
             else:
                 terminate_cfg(scenes[scene_label]["config-file"],scene_label)
     if os.path.exists(scenes[scene_label]["target-dir"]):
-        write2log(parent_log_path,"WARNING","Target directory in the config exists.")
+        write2log(parent_log_path,"INFO","Target directory in the config exists.")
         if not os.access(scenes[scene_label]["target-dir"], os.W_OK):
             write2log(parent_log_path,"ERROR","Target directory in config is not writable.")
             if scene_label == "cli":
