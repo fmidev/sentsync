@@ -301,7 +301,7 @@ for scene_label in scenes:
             else:
                 terminate_cfg(scenes[scene_label]["config-file"],scene_label)
 
-write2log(parent_log_path,severity="INFO",description="Config file and/or arguments are valid. Processing to download.")
+write2log(parent_log_path,severity="INFO",description="Config file and/or arguments are valid. Proceeding to download.")
 
 # check if there is any scene with rerun-latency option
 keep_running = False
