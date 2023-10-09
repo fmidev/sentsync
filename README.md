@@ -10,6 +10,8 @@
 
 nohup path_to_python_in_env_bin sentsync.py --config-file config_example.json 2>>/dev/null 1>>/dev/null &
 
+If the config content changes, process should be killed and restarted.
+
 # Packages in conda environment tested with:
 
 Name                    Version                   Build  Channel
