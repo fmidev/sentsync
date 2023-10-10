@@ -376,15 +376,24 @@ while last_run_time is None or keep_running:
 
             write2log(scenes[scene_label]["log-file"],severity="INFO",description="%s products found." % len(products))
 
-            try:
-                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download of %s products" % len(products))
-                api.download_all(products, scenes[scene_label]["target-dir"], max_attempts=2,checksum=True)
-                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Download is complete.")
-            except:
-                # TODO include download log/error to log
-                write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in downloading. Skipping download.")
-                write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
-                continue
+            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Checking if products exist.")
+            for product, filename in [(product,products[product]['filename']) for product in products]:
+                if filename + '.zip' in os.listdir(scenes[scene_label]["target-dir"]):
+                    del products[product]
+            write2log(scenes[scene_label]["log-file"],severity="INFO",description="Existing products removed from the list. %s new products found." % len(products))
+            
+            if (len(products)) == 0:
+                write2log(scenes[scene_label]["log-file"],severity="INFO",description="Nothing to download.")
+            else:
+                try:
+                    write2log(scenes[scene_label]["log-file"],severity="INFO",description="Starting the download of %s products" % len(products))
+                    api.download_all(products, scenes[scene_label]["target-dir"], max_attempts=2,checksum=True)
+                    write2log(scenes[scene_label]["log-file"],severity="INFO",description="Download is complete.")
+                except:
+                    # TODO include download log/error to log
+                    write2log(scenes[scene_label]["log-file"],severity="ERROR",description="Error in downloading. Skipping download.")
+                    write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
+                    continue
 
             if scenes[scene_label]["day-offset"] is not None:
                 write2log(scenes[scene_label]["log-file"],severity="INFO",description="Removing products out of day-offset range (rolling sync)")
@@ -408,3 +417,5 @@ while last_run_time is None or keep_running:
                         if file_not_valid:
                             os.remove(os.path.join(scenes[scene_label]["target-dir"],filename))
                             num_deleted += 1
+
+        write2log(parent_log_path,severity="INFO",description="Completed. Further information in the log file.")
