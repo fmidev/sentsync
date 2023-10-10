@@ -33,6 +33,7 @@
         "daily" : {
             "day-offset" : [0,-1],
             "rerun-latency" : 600,
+            "rolling" : false,
             "products" : {
                 "GRD" : {
                     "target-dir" : "/data/s1data/nrt",

@@ -395,7 +395,7 @@ while last_run_time is None or keep_running:
                     write2log(parent_log_path,severity="ERROR",description="Error in downloading. See log file at %s. Skipping download." % scenes[scene_label]["log-file"])
                     continue
 
-            if scenes[scene_label]["day-offset"] is not None:
+            if scenes[scene_label]["day-offset"] is not None and "day-rolling" in scenes[scene_label] and scenes[scene_label]["day-rolling"]:
                 write2log(scenes[scene_label]["log-file"],severity="INFO",description="Removing products out of day-offset range (rolling sync)")
                 num_deleted = 0
                 for filename in os.listdir(scenes[scene_label]["target-dir"]):
